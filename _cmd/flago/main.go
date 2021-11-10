@@ -45,7 +45,7 @@ type flagsValue struct {
 	RunCmd        string
 	Package       string
 	TypeName      string
-	UpperTypeName string
+	AllValuesName string
 	OriginalType  string
 	Splitter      string
 	OmitPrefix    bool
@@ -99,7 +99,7 @@ func run() error {
 
 	tn := args[2]
 	fv.TypeName = tn
-	fv.UpperTypeName = upperCase(tn)
+	fv.AllValuesName = getAllValues(tn)
 
 	fv.Mark = fmt.Sprintf("Auto Generated: %v", time.Now())
 	fv.RunCmd = fmt.Sprintf("Run Command   : %v", os.Args)
@@ -171,15 +171,16 @@ func funcMap() template.FuncMap {
 	return funcs
 }
 
-func upperCase(v string) string {
+const allValuesPrefix = "values"
+
+func getAllValues(v string) string {
 	l := v[0]
 	U := strings.ToUpper(string(l))
-	if len(v) == 1 {
-		return U
+	if len(v) != 1 {
+		U += v[1:]
 	}
 
-	U += v[1:]
-	return U
+	return fmt.Sprintf("%s%s", allValuesPrefix, U)
 }
 
 func mod(v, m int) bool {
@@ -202,8 +203,12 @@ const (
     {{ range $i,$v := .Values }} {{ if eq $i 0 }} {{ .Name }} {{ $.TypeName }} = 1 << iota {{ else }} {{ .Name }} {{ end }} {{printf "\n"}} {{ end }}
 )
 
-var values{{ .UpperTypeName }} = []{{.TypeName}}{
+var {{ .AllValuesName }} = []{{.TypeName}}{
     {{ range $i,$v := .Values }} {{ .Name }}, {{ if mod $i $.Mod }} {{ printf "\n" }} {{ end }} {{ end }}
+}
+
+func (r {{ .TypeName }}) Values() []{{.TypeName}} {
+	return {{ .AllValuesName }}
 }
 
 func (r {{ .TypeName }}) Equals(v {{ .TypeName }}) bool {
@@ -214,10 +219,14 @@ func (r {{ .TypeName }}) On(v {{ .TypeName }}) bool {
 	return (r & v) == v
 }
 
+func (r {{ .TypeName }}) Sum(v {{ .TypeName }}) {{.TypeName}} {
+	return (r | v)
+}
+
 func (r {{ .TypeName }}) String() string {
 
-	vals := make([]string, 0, len(values{{ .UpperTypeName }}))
-	for _, v := range values{{ .UpperTypeName }} {
+	vals := make([]string, 0, len({{ .AllValuesName }}))
+	for _, v := range {{ .AllValuesName }} {
 		if r.On(v) {
 			vals = append(vals, v.value())
 		}
